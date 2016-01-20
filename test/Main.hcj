@@ -1,0 +1,12 @@
+<style haha="haha" type="text/css">
+    body {background: black;}
+</style>
+<template>
+    <div></div>
+</template>
+<script>
+import {Component} from 'VComponent';
+export default class Main extends Component {
+    ready() {}
+}
+</script>
