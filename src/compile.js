@@ -1,24 +1,46 @@
 var babel = require('babel-core');
 
-function compile(sourceObj) {
-    var templateCode = sourceObj.template.code.replace(/\'/g, '\\\'').replace(/\n/g, '\\\n');
-    return getStyleCode(sourceObj.style)
+function compile(sourceObj, dirname) {
+    return getStyleCode(sourceObj.style, dirname)
         .then(function (styleCode) {
-            styleCode = sourceObj.style.code.replace(/\'/g, '\\\'').replace(/\n/g, '\\\n');
-            var code = babel.transform(sourceObj.script.code, {
-                presets: ['es2015'],
-                plugins: ['transform-es2015-modules-amd']
-            }).code;
-
-            code = code.replace(/\}\);$/, '\n(' + insertCodeFn.toString() + ')(exports.default, \'' + templateCode + '\', \'' + styleCode + '\')\n});');
-
-            return code;
+            var scriptCode = getScriptCode(sourceObj.script);
+            var templateCode = getTemplateCode(sourceObj.template);
+            return combine(styleCode, templateCode, scriptCode);
         });
 }
 
-function getStyleCode(styleObj) {
+function combine(styleCode, templateCode, scriptCode) {
+    return scriptCode.replace(
+        /\}\);$/,
+        '\n('
+            + insertCodeFn.toString()
+            + ')(exports.default, \''
+            + templateCode
+            + '\', \''
+            + styleCode + '\')\n});'
+    );
+}
+
+function getScriptCode(scriptObj) {
+    return babel.transform(scriptObj.code, {
+        presets: ['es2015'],
+        plugins: ['transform-es2015-modules-amd']
+    }).code;
+}
+
+function getTemplateCode(templateObj) {
+    if (!templateObj) {
+        return '';
+    }
+    return templateObj.code.replace(/\'/g, '\\\'').replace(/\n/g, '\\\n');
+}
+
+function getStyleCode(styleObj, dirname) {
     return new Promise(function (resolve, reject) {
-        if (styleObj.type === 'text/css' || styleObj.type === 'css') {
+        if (!styleObj) {
+            resolve('');
+        }
+        else if (styleObj.type === 'text/css' || styleObj.type === 'css') {
             resolve(styleObj.code);
         }
         else if (styleObj.type === 'less') {
@@ -32,24 +54,29 @@ function getStyleCode(styleObj) {
         }
         else if (styleObj.type === 'sass') {
             require('node-sass').render({
-                data: styleObj.code
+                data: styleObj.code,
+                includePaths: dirname ? [dirname] : null
             }, function (error, result) {
                 if (error) {
                     return reject(error);
                 }
-                resolve(result);
+                resolve(result.css.toString());
             });
         }
         else {
             throw new Error('unsupported style type!');
         }
+    }).then(function (code) {
+        return code.replace(/\'/g, '\\\'').replace(/\n/g, '\\\n');
     });
 }
 
 function insertCodeFn(exportObj, template, style) {
-    if (typeof exports.default === 'object') {
-        exportObj.prototype.getTemplate === undefined && (exportObj.getTemplate = function () { return template; });
-        exportObj.getStyle === undefined && (exportObj.getStyle = function () { return style; });
+    if (typeof exportObj === 'function') {
+        !exportObj.prototype.hasOwnProperty('getTemplate')
+            && (exportObj.prototype.getTemplate = function () { return template; });
+        !exportObj.hasOwnProperty('getStyle')
+            && (exportObj.getStyle = function () { return style; });
     }
 }
 
