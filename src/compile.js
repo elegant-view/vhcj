@@ -1,4 +1,4 @@
-var babel = require('babel-core');
+var babel = require('babel');
 
 function compile(sourceObj, dirname) {
     return getStyleCode(sourceObj.style, dirname)
@@ -14,7 +14,7 @@ function combine(styleCode, templateCode, scriptCode) {
         /\}\);$/,
         '\n('
             + insertCodeFn.toString()
-            + ')(exports.default, \''
+            + ')(module.exports, \''
             + templateCode
             + '\', \''
             + styleCode + '\')\n});'
@@ -23,8 +23,12 @@ function combine(styleCode, templateCode, scriptCode) {
 
 function getScriptCode(scriptObj) {
     return babel.transform(scriptObj.code, {
-        presets: ['es2015'],
-        plugins: ['transform-es2015-modules-amd']
+        "stage": 0,
+        "modules": "amd",
+        "compact": false,
+        "ast": false,
+        "blacklist": ["strict"],
+        "externalHelpers": false
     }).code;
 }
 
